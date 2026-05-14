@@ -3,7 +3,15 @@ import Stripe from 'stripe';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+let stripeClient: Stripe | null = null;
+
+function getStripeClient(): Stripe {
+  if (stripeClient) return stripeClient;
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) throw new Error('stripe_secret_key_missing');
+  stripeClient = new Stripe(secretKey);
+  return stripeClient;
+}
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -31,6 +39,7 @@ export async function POST(req: NextRequest) {
 
     if (error || !order) throw new Error('order_create_failed');
 
+    const stripe = getStripeClient();
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
