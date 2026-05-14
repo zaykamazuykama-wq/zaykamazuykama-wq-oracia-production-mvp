@@ -4,7 +4,15 @@ import { supabase } from '@/lib/supabase';
 import { resumeFulfillment } from '@/lib/fulfillment';
 import { safeErrorCode } from '@/lib/utils';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+let stripeClient: Stripe | null = null;
+
+function getStripeClient(): Stripe {
+  if (stripeClient) return stripeClient;
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) throw new Error('stripe_secret_key_missing');
+  stripeClient = new Stripe(secretKey);
+  return stripeClient;
+}
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -13,7 +21,7 @@ export async function POST(req: NextRequest) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET);
+    event = getStripeClient().webhooks.constructEvent(rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET);
   } catch {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
