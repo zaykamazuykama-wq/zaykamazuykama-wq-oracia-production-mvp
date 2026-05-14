@@ -1,8 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-let cachedClient: ReturnType<typeof createClient> | null = null;
+type UntypedSupabaseClient = SupabaseClient<any, any, any>;
 
-export function getSupabaseClient(): ReturnType<typeof createClient> {
+let cachedClient: UntypedSupabaseClient | null = null;
+
+export function getSupabaseClient(): UntypedSupabaseClient {
   if (cachedClient) return cachedClient;
 
   const url = process.env.SUPABASE_URL;
@@ -12,14 +14,14 @@ export function getSupabaseClient(): ReturnType<typeof createClient> {
     throw new Error('supabase_env_missing');
   }
 
-  cachedClient = createClient(url, serviceRoleKey, {
+  cachedClient = createClient<any, any, any>(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
   return cachedClient;
 }
 
-export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+export const supabase = new Proxy({} as UntypedSupabaseClient, {
   get(_target, property, receiver) {
     const client = getSupabaseClient();
     const value = Reflect.get(client, property, receiver);
