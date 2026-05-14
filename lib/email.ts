@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { SELF_REFLECTION_DISCLAIMER, AGENCY_FRAME } from './safety';
 import { supabase } from './supabase';
 import { escapeHtml, noPiiLog } from './utils';
 
@@ -21,15 +22,19 @@ export async function sendEmailWithLink(to: string, name: string | null, orderId
 
   const baseUrl = process.env.APP_BASE_URL.replace(/\/$/, '');
   const downloadUrl = `${baseUrl}/report/${encodeURIComponent(orderId)}?token=${encodeURIComponent(order.download_token)}`;
+  const helpUrl = `${baseUrl}/help`;
   const safeUrl = escapeHtml(downloadUrl);
+  const safeHelpUrl = escapeHtml(helpUrl);
   const safeName = escapeHtml(name || 'there');
 
   const html = `
     <h2>Hello ${safeName},</h2>
     <p>Thank you for purchasing the ORACIA full report. Your symbolic blueprint is ready.</p>
+    <p><strong>Before reading:</strong> ${escapeHtml(AGENCY_FRAME)}</p>
     <p><a href="${safeUrl}" style="background:#c6a355;padding:12px 24px;color:white;border-radius:40px;text-decoration:none;">Download your report</a></p>
     <p>If the link does not work, copy and paste this URL:<br>${safeUrl}</p>
-    <p><em>ORACIA is for entertainment and self-reflection only.</em></p>
+    <p><em>${escapeHtml(SELF_REFLECTION_DISCLAIMER)}</em></p>
+    <p>If you feel unsafe or at risk of harming yourself or someone else, contact local emergency services or a crisis hotline. ORACIA is not crisis support. Resources: <a href="${safeHelpUrl}">${safeHelpUrl}</a></p>
   `;
 
   const { data, error: sendError } = await getResendClient().emails.send({
