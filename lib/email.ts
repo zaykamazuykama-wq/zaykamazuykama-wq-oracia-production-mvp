@@ -2,7 +2,15 @@ import { Resend } from 'resend';
 import { supabase } from './supabase';
 import { escapeHtml, noPiiLog } from './utils';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend {
+  if (resendClient) return resendClient;
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error('resend_api_key_missing');
+  resendClient = new Resend(apiKey);
+  return resendClient;
+}
 
 export async function sendEmailWithLink(to: string, name: string | null, orderId: string): Promise<string> {
   if (!process.env.APP_BASE_URL) throw new Error('app_base_url_missing');
@@ -24,7 +32,7 @@ export async function sendEmailWithLink(to: string, name: string | null, orderId
     <p><em>ORACIA is for entertainment and self-reflection only.</em></p>
   `;
 
-  const { data, error: sendError } = await resend.emails.send({
+  const { data, error: sendError } = await getResendClient().emails.send({
     from: process.env.REPORT_FROM_EMAIL,
     to,
     subject: 'Your ORACIA Report is ready',
