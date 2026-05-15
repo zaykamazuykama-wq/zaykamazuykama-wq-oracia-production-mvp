@@ -147,3 +147,13 @@ export async function resumeFulfillment(session: Stripe.Checkout.Session, orderI
   if (order.status !== 'fulfilled') throw new Error(`fulfillment_incomplete_${order.status}`);
   return order;
 }
+
+export async function resumePaidOrderFulfillment(orderId: string): Promise<Order> {
+  let order = await getOrder(orderId);
+  if (order.status === 'pending_payment') throw new Error('payment_not_paid');
+  if (order.status === 'refunded') throw new Error('order_refunded');
+  order = await generateAndStoreReportIfNeeded(order);
+  order = await sendEmailIfNeeded(order);
+  if (order.status !== 'fulfilled') throw new Error(`fulfillment_incomplete_${order.status}`);
+  return order;
+}
