@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    name: Typecheck and build
+    name: Typecheck, smoke test, and build
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -29,6 +29,9 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Smoke test PDF generation
+        run: npm run smoke-test
 
       - name: Build
         run: npm run build
