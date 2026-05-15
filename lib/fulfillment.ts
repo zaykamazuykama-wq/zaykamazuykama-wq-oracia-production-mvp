@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import type Stripe from 'stripe';
 import { supabase } from './supabase';
-import { generateReportHtml } from './report-generator';
-import { generatePdfBuffer } from './pdf';
+import { composeReport, renderReportHtml } from './report-generator';
+import { generatePdfBufferFromReport } from './pdf';
 import { storeReportPdf } from './storage';
 import { sendEmailWithLink } from './email';
 import { safeErrorCode } from './utils';
@@ -22,6 +22,17 @@ export type Order = {
   email_sent_at: string | null;
 };
 
+function expectedAmount(): number {
+  const raw = process.env.EXPECTED_PRICE_USD_CENTS || '1999';
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error('invalid_expected_price_config');
+  return parsed;
+}
+
+function expectedCurrency(): string {
+  return (process.env.EXPECTED_CURRENCY || 'usd').trim().toLowerCase();
+}
+
 export async function getOrder(orderId: string): Promise<Order> {
   const { data, error } = await supabase.from('orders').select('*').eq('id', orderId).single();
   if (error || !data) throw new Error('order_not_found');
@@ -31,8 +42,8 @@ export async function getOrder(orderId: string): Promise<Order> {
 export async function validateCheckoutSession(session: Stripe.Checkout.Session, order: Order) {
   if (session.payment_status !== 'paid') throw new Error('payment_not_paid');
   if (session.mode !== 'payment') throw new Error('invalid_payment_mode');
-  if (session.amount_total !== 1999) throw new Error('invalid_amount');
-  if (session.currency !== 'usd') throw new Error('invalid_currency');
+  if (session.amount_total !== expectedAmount()) throw new Error('invalid_amount');
+  if ((session.currency || '').toLowerCase() !== expectedCurrency()) throw new Error('invalid_currency');
   if (session.id !== order.stripe_session_id) throw new Error('session_mismatch');
 }
 
@@ -53,8 +64,9 @@ async function generateAndStoreReportIfNeeded(order: Order): Promise<Order> {
   if (order.status === 'fulfilled' || order.report_pdf_path) return order;
   await supabase.from('orders').update({ status: 'generating_report' }).eq('id', order.id);
   try {
-    const reportHtml = generateReportHtml(order);
-    const pdf = await generatePdfBuffer(reportHtml);
+    const report = composeReport(order);
+    const reportHtml = renderReportHtml(report);
+    const pdf = await generatePdfBufferFromReport(report);
     const path = await storeReportPdf(order.id, pdf);
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
